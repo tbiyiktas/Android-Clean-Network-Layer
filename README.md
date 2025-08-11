@@ -1,92 +1,135 @@
-# Android Clean Network Layer
+Android Clean Network Layer
+A lightweight, clean, and third-party–free HTTP client for Android.
+Built on Java’s HttpURLConnection, it uses a Producer–Consumer queue with worker threads, supports generic responses, cancellation, bounded backpressure, per-request timeouts, retries with exponential backoff, gzip, and a clean callback interface.
 
-This library provides a **URLConnection**-based network layer for Android, without using any third-party HTTP libraries. It implements a **Producer–Consumer pattern** with generic type support for request and response handling.
+Requirements
+Android: API 21+
 
-## Features
+Java: 8+
 
-* Generic type support for `TRequest` and `TResponse`
-* Request queue management using Producer–Consumer pattern
-* Thread-safe architecture
-* Cancellable requests (`RequestHandle.cancel()`)
-* Simple JSON conversion
-* Configurable timeouts
+Add Internet permission:
 
-## Usage
+xml
+Copy
+Edit
+<uses-permission android:name="android.permission.INTERNET" />
+Packaging: this repo is source-first. Copy the module into your project or package it as an AAR and include it.
 
-### Initialization
+Features
+No third-party HTTP libs: pure HttpURLConnection.
 
-```java
+Producer–Consumer queue (bounded): prevents OOM under load.
+
+Cancellation: every call returns a RequestHandle → cancel().
+
+Per-request timeouts: override connect/read timeouts when needed.
+
+Retry & backoff: for idempotent methods (GET/PUT/DELETE) on IOException, 429 (honors Retry-After), 503.
+
+Gzip: handles compressed responses.
+
+PATCH compatibility: reflection fallback for older Android versions.
+
+Typed responses: NetResult<T> with Success / Error branches.
+
+Quick Start
+1) Initialize (optional singleton)
+java
+Copy
+Edit
+public class MyApplication extends Application {
+    private static MyApplication instance;
+    private NetworkManager network;
+
+    @Override public void onCreate() {
+        super.onCreate();
+        instance = this;
+        network = NetworkManager.create("https://jsonplaceholder.typicode.com");
+    }
+
+    public static NetworkManager network() { return instance.network; }
+}
+Or create ad-hoc:
+
+java
+Copy
+Edit
 NetworkManager api = NetworkManager.create("https://jsonplaceholder.typicode.com");
-```
+2) Make requests (matches your API)
+GET
 
-### GET
-
-```java
-api.get("/todos/1", null, Todo.class, new NetworkCallback<Todo>() {
-    @Override public void onResult(NetResult<Todo> result) {
-        if (result.isSuccess()) {
-            Todo data = result.getData();
-            Log.d("API", "Success: " + data.getTitle());
-        } else {
-            Log.e("API", "Error: " + result.getError());
+java
+Copy
+Edit
+api.get("/todos/1", /* queryParams */ null, Todo.class,
+    new NetworkCallback<Todo>() {
+        @Override public void onResult(NetResult<Todo> result) {
+            if (result.isSuccess()) {
+                Todo data = result.getData();
+                Log.d("API", "Title: " + data.getTitle());
+            } else {
+                Log.e("API", result.getError());
+            }
         }
-    }
-});
-```
+    });
+Cancelable GET
 
-### Cancellable GET
-
-```java
-RequestHandle handle = api.get("/todos/1", null, Todo.class, new NetworkCallback<Todo>() {
-    @Override public void onResult(NetResult<Todo> result) {
-        // handle result
-    }
-});
-
+java
+Copy
+Edit
+RequestHandle handle = api.get("/todos/1", null, Todo.class,
+    new NetworkCallback<Todo>() {
+        @Override public void onResult(NetResult<Todo> result) { /* ... */ }
+    });
+// later
 handle.cancel();
-```
+POST (body is String JSON by design)
 
-### POST (String JSON)
-
-```java
-String body = new JSONObject()
+java
+Copy
+Edit
+String body = new org.json.JSONObject()
         .put("title", "Algebra 1")
         .put("completed", false)
         .toString();
 
-api.post("/todos", body, Todo.class, new NetworkCallback<Todo>() {
-    @Override public void onResult(NetResult<Todo> result) {
-        if (result.isSuccess()) {
-            Log.d("API", "Created: " + result.getData().getId());
+api.post("/todos", body, Todo.class,
+    new NetworkCallback<Todo>() {
+        @Override public void onResult(NetResult<Todo> result) {
+            if (result.isSuccess()) {
+                Log.d("API", "Created id: " + result.getData().getId());
+            }
         }
-    }
-});
-```
+    });
+Per-request timeouts (if you exposed overloads)
 
-### PUT / PATCH
+java
+Copy
+Edit
+api.post("/todos", body, /* connect */ 5_000, /* read */ 10_000,
+    Todo.class, new NetworkCallback<Todo>() { @Override public void onResult(NetResult<Todo> r) { /* ... */ } });
+PUT / PATCH / DELETE
 
-```java
-api.put("/todos/1", body, Todo.class, new NetworkCallback<Todo>() { /* ... */ });
-api.patch("/todos/1", body, Todo.class, new NetworkCallback<Todo>() { /* ... */ });
-```
+java
+Copy
+Edit
+api.put("/todos/1", body,  Todo.class, new NetworkCallback<Todo>()  { @Override public void onResult(NetResult<Todo> r) { /* ... */ }});
+api.patch("/todos/1", body, Todo.class, new NetworkCallback<Todo>() { @Override public void onResult(NetResult<Todo> r) { /* ... */ }});
+api.delete("/todos/1", null, String.class, new NetworkCallback<String>() { @Override public void onResult(NetResult<String> r) { /* ... */ }});
+Error Handling
+Every callback receives NetResult<T>:
 
-### DELETE
+result.isSuccess() / result.isError()
 
-```java
-api.delete("/todos/1", null, Void.class, new NetworkCallback<Void>() {
-    @Override public void onResult(NetResult<Void> result) {
-        if (result.isSuccess()) {
-            Log.d("API", "Deleted");
-        }
-    }
-});
-```
+result.getData() on success
 
-## Error Handling
+result.getError() (message), getResponseCode(), and getException() on error
 
-* Use `isError()` and `getError()` to get error details.
-* If the request queue is full, an error is returned immediately.
+Queue full: returns an immediate error (e.g., “Queue full / 429”)
 
-## License
-
-MIT
+Configuration (defaults live in NetworkConfig)
+Setting	Purpose
+QUEUE_CAPACITY	Bounded queue size to prevent memory pressure.
+THREAD_POOL_SIZE	Number of worker threads.
+CONNECT_TIMEOUT_MS / READ_TIMEOUT_MS	Defaults; can be overridden per request.
+RETRY_LIMIT, INITIAL_RETRY_DELAY_MS	Exponential backoff for idempotent requests; honors Retry-After.
