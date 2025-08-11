@@ -12,10 +12,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.io.IOException;
 import java.util.List;
 
+import lib.api.TodoApi;
+import lib.model.Todo;
 import lib.net.NetResult;
 import lib.net.NetworkCallback;
 import lib.net.NetworkManager;
@@ -74,15 +74,46 @@ public class MainActivity extends AppCompatActivity {
 
 
         // GET LIST
-        Type todoListType = new TypeToken<List<Todo>>() {}.getType();
+//        Type todoListType = new TypeToken<List<Todo>>() {}.getType();
+//
+//        NetworkManager exampleApiClient = NetworkManager.create("https://jsonplaceholder.typicode.com");
+//
+//        exampleApiClient.get("/todos", null, null, todoListType, new NetworkCallback<List<Todo>>() {
+//            @Override
+//            public void onResult(NetResult<List<Todo>> result) {
+//                // Log mesajını da doğru duruma göre düzenleyelim
+//                Log.d(TAG, "API isteği tamamlandı.");
+//                handleResult(result);
+//            }
+//        });
 
-        NetworkManager exampleApiClient = NetworkManager.create("https://jsonplaceholder.typicode.com");
+        TodoApi api = new TodoApi();
 
-        exampleApiClient.get("/todos", null, null, todoListType, new NetworkCallback<List<Todo>>() {
+        api.getTodos(new NetworkCallback<List<Todo>>() {
             @Override
             public void onResult(NetResult<List<Todo>> result) {
-                // Log mesajını da doğru duruma göre düzenleyelim
-                Log.d(TAG, "API isteği tamamlandı.");
+//                if (result instanceof NetResult.Success) {
+//                    List<Todo> todos = ((NetResult.Success<List<Todo>>) result).Data();
+//                    System.out.println("Başarılı: " + todos.size() + " adet todo alındı.");
+//
+//                    // İlk 5 tanesini ekrana yazdıralım
+//                    for (int i = 0; i < 5 && i < todos.size(); i++) {
+//                        System.out.println(todos.get(i));
+//                    }
+//                } else if (result instanceof NetResult.Error) {
+//                    NetResult.Error<?> error = (NetResult.Error<?>) result;
+//                    int responseCode = error.getResponseCode();
+//                    String errorBody = error.getErrorBody();
+//
+//                    if (responseCode == 404) {
+//                        Log.e(TAG, "Hata oluştu: Kaynak bulunamadı (404) - " + errorBody);
+//                        statusTextView.setText("Hata: Kaynak bulunamadı!");
+//                    } else {
+//                        Log.e(TAG, "Hata oluştu: " + error.getException().getMessage() + " (Kod: " + responseCode + ")");
+//                        statusTextView.setText("Hata: " + error.getException().getMessage());
+//                    }
+//                }
+
                 handleResult(result);
             }
         });

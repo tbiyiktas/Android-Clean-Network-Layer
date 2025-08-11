@@ -89,8 +89,9 @@ public class NetworkManager {
         }
     }
 
-    private <T> RequestHandle enqueueRequest(String basePath, ACommand command, Class<T> responseClass, NetworkCallback<T> callback) {
-        RequestTask<T> task = new RequestTask<>(basePath, command, callback, responseClass);
+    // GÜNCELLENDİ: enqueueRequest metodu Class yerine Type alıyor.
+    private <T> RequestHandle enqueueRequest(String basePath, ACommand command, Type responseType, NetworkCallback<T> callback) {
+        RequestTask<T> task = new RequestTask<>(basePath, command, callback, responseType);
         if (!requestQueue.offer(task)) {
             Log.w(TAG, "Kuyruk dolu, istek reddedildi: " + command.getRelativeUrl());
             mainHandler.post(() -> callback.onResult(new NetResult.Error<>(
@@ -102,31 +103,34 @@ public class NetworkManager {
         return command;
     }
 
-    // Yeni get metodu: Class yerine Type parametresi alıyor
+    // GÜNCELLENDİ: Artık tek bir ve daha esnek 'get' metodumuz var.
     public <T> RequestHandle get(String relativePath, HashMap<String, String> queryParams, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
         ACommand command = new GetCommand(relativePath, queryParams, headers);
-        RequestTask<T> task = new RequestTask<>(this.basePath, command, callback, responseType);
-        if (!requestQueue.offer(task)) {
-            Log.w(TAG, "Kuyruk dolu, istek reddedildi: " + relativePath);
-            return new RequestHandle() { @Override public void cancel() {} @Override public boolean isCancelled() { return true; } };
-        }
-        activeRequests.put(command, task);
-        return command;
+        return enqueueRequest(this.basePath, command, responseType, callback);
     }
 
-    public <T> RequestHandle get(String relativePath, HashMap<String, String> queryParams, HashMap<String, String> headers, Class<T> responseClass, NetworkCallback<T> callback) {
-        ACommand command = new GetCommand(relativePath, queryParams, headers);
-        return enqueueRequest(this.basePath, command, responseClass, callback);
-    }
-
-    // Diğer tüm komut metotları da enqueueRequest metotunu çağıracak şekilde güncellendi.
-    public <T> RequestHandle get(String relativePath, HashMap<String, String> queryParams, Class<T> responseClass, NetworkCallback<T> callback) {
-        return get(relativePath, queryParams, null, responseClass, callback);
-    }
-
-    public <T> RequestHandle post(String relativePath, String jsonContent, HashMap<String, String> headers, Class<T> responseClass, NetworkCallback<T> callback) {
+    // YENİ METOT: Post isteği için
+    public <T> RequestHandle post(String relativePath, String jsonContent, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
         ACommand command = new PostCommand(relativePath, jsonContent, headers);
-        return enqueueRequest(this.basePath, command, responseClass, callback);
+        return enqueueRequest(this.basePath, command, responseType, callback);
+    }
+
+    // YENİ METOT: Put isteği için
+    public <T> RequestHandle put(String relativePath, String jsonContent, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
+        ACommand command = new PutCommand(relativePath, jsonContent, headers);
+        return enqueueRequest(this.basePath, command, responseType, callback);
+    }
+
+    // YENİ METOT: Delete isteği için
+    public <T> RequestHandle delete(String relativePath, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
+        ACommand command = new DeleteCommand(relativePath, headers);
+        return enqueueRequest(this.basePath, command, responseType, callback);
+    }
+
+    // YENİ METOT: Dosya yükleme (Multipart) isteği için
+    public <T> RequestHandle upload(String relativePath, HashMap<String, String> formFields, HashMap<String, File> files, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
+        ACommand command = new MultipartCommand(relativePath, headers, formFields, files);
+        return enqueueRequest(this.basePath, command, responseType, callback);
     }
 
     private static class RequestTask<T> {

@@ -1,4 +1,4 @@
-package com.example.android_clean_network_layer;
+package lib.model;
 
 /*
 
