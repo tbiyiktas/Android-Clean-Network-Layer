@@ -133,3 +133,53 @@ QUEUE_CAPACITY	Bounded queue size to prevent memory pressure.
 THREAD_POOL_SIZE	Number of worker threads.
 CONNECT_TIMEOUT_MS / READ_TIMEOUT_MS	Defaults; can be overridden per request.
 RETRY_LIMIT, INITIAL_RETRY_DELAY_MS	Exponential backoff for idempotent requests; honors Retry-After.
+
+Architecture (PlantUML)
+Paste into docs/architecture.puml or keep here and render with PlantUML/Kroki.
+
+plantuml
+Copy
+Edit
+@startuml
+skinparam classAttributeIconSize 0
+
+interface "NetworkCallback<T>" as NetworkCallbackT
+abstract class "NetResult<T>" as NetResultT
+class "NetResultSuccess<T>" as NetResultSuccessT
+class "NetResultError<T>" as NetResultErrorT
+
+class NetworkManager {
+  - requestExecutor : ExecutorService
+  - requestQueue : BlockingQueue<RequestTask>
+  - mainHandler : Handler
+  - responseHandler : ResponseHandler
+  - connectionFactory : IHttpConnectionFactory
+  - basePath : String
+  + get(...), post(...), put(...), patch(...), delete(...), upload(...)
+}
+
+NetworkCallbackT : + onResult(result : NetResultT)
+NetResultSuccessT --|> NetResultT
+NetResultErrorT   --|> NetResultT
+
+NetworkManager *-- ResponseHandler        : has
+NetworkManager o-- IHttpConnectionFactory : uses
+NetworkManager ..> ACommand               : enqueues
+ResponseHandler --> IResponseParser       : delegates
+HttpConnectionAdapter ..|> IHttpConnection
+HttpUrlConnectionFactory ..|> IHttpConnectionFactory
+HttpUrlConnectionFactory --> HttpConnectionAdapter : creates
+GetCommand --|> ACommand
+PostCommand --|> ACommand
+PutCommand --|> ACommand
+PatchCommand --|> ACommand
+DeleteCommand --|> ACommand
+MultipartCommand --|> ACommand
+@enduml
+Contributing
+Fork → branch → PR
+
+Please include a brief description, and if relevant, a small test or sample.
+
+License
+MIT
