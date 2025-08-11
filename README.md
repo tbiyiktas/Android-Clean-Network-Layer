@@ -1,90 +1,95 @@
 # Android Clean Network Layer 🚀
 
-This repository provides a robust and clean network layer implementation for Android applications, designed with modularity, testability, and maintainability in mind. It avoids third-party HTTP libraries, relying purely on `HttpURLConnection` for core network operations.
+This repository provides a robust and clean network layer implementation for Android applications, designed with modularity, testability, and maintainability in mind. It avoids third-party HTTP libraries, relying purely on **HttpURLConnection** for core network operations.
 
 ---
 
 ## 📦 Packaging
-
-This repository is source-first. You can integrate it into your project by copying the `lib` module directly into your project's `app/src/main/java/` directory or by packaging it as an AAR (Android Archive) and including it as a dependency.
+This repository is **source-first**.  
+You can integrate it into your project by copying the `lib` module directly into your project's `app/src/main/java/` directory or by packaging it as an AAR (Android Archive) and including it as a dependency.
 
 ---
 
 ## ✨ Features
-
-* **No third-party HTTP libs:** Built entirely using pure `HttpURLConnection` for core networking.
-* **Producer–Consumer queue (bounded):** Prevents Out Of Memory (OOM) errors under heavy load by limiting concurrent requests.
-* **Cancellation:** Every network call returns a `RequestHandle` allowing you to cancel ongoing requests with `.cancel()`.
-* **Per-request timeouts:** Override global connect/read timeouts for specific requests when needed.
-* **Retry & backoff:** Implements automatic retry with exponential backoff for idempotent methods (GET, PUT, DELETE) on `IOException`, HTTP 429 (Too Many Requests – honoring `Retry-After` header), and 503 (Service Unavailable) responses.
-* **Gzip support:** Automatically handles compressed responses (Content-Encoding: gzip) for both success and error streams.
-* **PATCH compatibility:** Includes a reflection-based fallback for `PATCH` method support on older Android versions that might not natively support it.
-* **Typed responses:** Responses are encapsulated in a `NetResult<T>` sealed class, providing clear `Success` and `Error` branches for easy handling.
+- **No third-party HTTP libs:** Built entirely using pure `HttpURLConnection` for core networking.  
+- **Producer–Consumer queue (bounded):** Prevents Out Of Memory (OOM) errors under heavy load by limiting concurrent requests.  
+- **Cancellation:** Every network call returns a `RequestHandle` allowing you to cancel ongoing requests with `.cancel()`.  
+- **Per-request timeouts:** Override global connect/read timeouts for specific requests when needed.  
+- **Retry & backoff:** Automatic retry with exponential backoff for idempotent methods (`GET`, `PUT`, `DELETE`) on `IOException`, HTTP 429 (`Retry-After` header supported), and HTTP 503.  
+- **Gzip support:** Automatically handles compressed responses (`Content-Encoding: gzip`) for both success and error streams.  
+- **PATCH compatibility:** Reflection-based fallback for PATCH support on older Android versions.  
+- **Typed responses:** Responses are encapsulated in a `NetResult<T>` sealed class with clear `Success` and `Error` branches.
 
 ---
 
 ## 🚀 Quick Start
 
-### 1) Initialize (Optional Singleton)
+### 1) Add Permission
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+```
 
-You can initialize `NetworkManager` as a singleton within your `Application` class:
-
+### 2) Initialize (Optional Singleton)
 ```java
 public class MyApplication extends Application {
     private static MyApplication instance;
     private NetworkManager network;
 
-    @Override public void onCreate() {
+    @Override
+    public void onCreate() {
         super.onCreate();
         instance = this;
-        // Replace with your actual base URL
-        network = NetworkManager.create("[https://jsonplaceholder.typicode.com](https://jsonplaceholder.typicode.com)"); 
+        network = NetworkManager.create("https://jsonplaceholder.typicode.com");
     }
 
-    public static NetworkManager network() { 
-        return instance.network; 
+    public static NetworkManager network() {
+        return instance.network;
     }
 }
-Or, create an ad-hoc instance wherever needed:
+```
 
-Java
+Or create ad-hoc:
+```java
+NetworkManager api = NetworkManager.create("https://jsonplaceholder.typicode.com");
+```
 
-NetworkManager api = NetworkManager.create("[https://jsonplaceholder.typicode.com](https://jsonplaceholder.typicode.com)");
-2) Make Requests
-Ensure you have your data models (e.g., Todo class) defined in your model package.
+---
 
-GET Request
-Java
+## 📡 Making Requests
 
-// Assuming 'api' is an instance of NetworkManager or ABaseApi subclass
+### GET Request
+```java
 api.get("/todos/1", /* queryParams */ null, /* headers */ null, Todo.class,
     new NetworkCallback<Todo>() {
-        @Override 
+        @Override
         public void onResult(NetResult<Todo> result) {
             if (result.isSuccess()) {
-                Todo data = result.Data(); // Use .Data() as per NetResult class
+                Todo data = result.Data();
                 Log.d("API", "Title: " + data.title);
             } else {
-                Log.e("API", "Error: " + result.getErrorBody() + " Code: " + result.getResponseCode());
+                Log.e("API", "Error: " + result.getErrorBody()
+                    + " Code: " + result.getResponseCode());
             }
         }
     });
-Cancelable GET Request
-Java
+```
 
+### Cancelable GET
+```java
 RequestHandle handle = api.get("/todos/1", null, null, Todo.class,
     new NetworkCallback<Todo>() {
-        @Override 
-        public void onResult(NetResult<Todo> result) { 
-            /* Handle result */ 
+        @Override
+        public void onResult(NetResult<Todo> result) {
+            // handle result
         }
     });
 
-// ...later in your app logic
-handle.cancel(); // Cancel the ongoing request
-POST Request (Body as JSON String)
-Java
+// Later
+handle.cancel();
+```
 
+### POST Request
+```java
 String body = new org.json.JSONObject()
         .put("title", "Android Network Layer")
         .put("completed", false)
@@ -92,7 +97,7 @@ String body = new org.json.JSONObject()
 
 api.post("/todos", body, /* headers */ null, Todo.class,
     new NetworkCallback<Todo>() {
-        @Override 
+        @Override
         public void onResult(NetResult<Todo> result) {
             if (result.isSuccess()) {
                 Log.d("API", "Created todo with id: " + result.Data().id);
@@ -101,58 +106,54 @@ api.post("/todos", body, /* headers */ null, Todo.class,
             }
         }
     });
-PUT / PATCH / DELETE Requests
-Java
+```
 
-// PUT Request
-api.put("/todos/1", body, /* headers */ null, Todo.class, new NetworkCallback<Todo>()  { 
-    @Override 
-    public void onResult(NetResult<Todo> r) { /* Handle result */ }
+### PUT / PATCH / DELETE
+```java
+// PUT
+api.put("/todos/1", body, null, Todo.class, new NetworkCallback<Todo>() {
+    @Override public void onResult(NetResult<Todo> r) { /* ... */ }
 });
 
-// PATCH Request
-api.patch("/todos/1", body, /* headers */ null, Todo.class, new NetworkCallback<Todo>() { 
-    @Override 
-    public void onResult(NetResult<Todo> r) { /* Handle result */ }
+// PATCH
+api.patch("/todos/1", body, null, Todo.class, new NetworkCallback<Todo>() {
+    @Override public void onResult(NetResult<Todo> r) { /* ... */ }
 });
 
-// DELETE Request
-api.delete("/todos/1", /* headers */ null, String.class, new NetworkCallback<String>() { 
-    @Override 
-    public void onResult(NetResult<String> r) { /* Handle result */ }
+// DELETE
+api.delete("/todos/1", null, String.class, new NetworkCallback<String>() {
+    @Override public void onResult(NetResult<String> r) { /* ... */ }
 });
-🚦 Error Handling
-Every network callback receives a NetResult<T> object, which is a sealed class representing either a success or an error:
+```
 
-result.isSuccess() / result.isError(): Check the status of the request.
+---
 
-result.Data(): Access the parsed data on success.
+## 🚦 Error Handling
+Each request returns a `NetResult<T>`:
+- `result.isSuccess()` / `result.isError()`  
+- `result.Data()` → parsed object (success)  
+- `result.getException()` → underlying exception (error)  
+- `result.getResponseCode()` → HTTP status (error)  
+- `result.getErrorBody()` → raw error body (error)  
 
-result.getException(): Get the underlying exception on error.
+If the request queue is full, it immediately returns a `NetResult.Error` with HTTP 429.
 
-result.getResponseCode(): Get the HTTP status code on error.
+---
 
-result.getErrorBody(): Get the raw error response body (if available) on error.
+## ⚙️ Configuration (NetworkConfig)
+| Setting                  | Purpose |
+|--------------------------|---------|
+| `QUEUE_CAPACITY`         | Max queue size to avoid OOM |
+| `THREAD_POOL_SIZE`       | Worker thread count |
+| `CONNECT_TIMEOUT_MS`     | Default connect timeout (ms) |
+| `READ_TIMEOUT_MS`        | Default read timeout (ms) |
+| `RETRY_LIMIT`            | Max retries for idempotent requests |
+| `INITIAL_RETRY_DELAY_MS` | Initial retry delay (ms, exponential backoff) |
 
-If the request queue is full, enqueueRequest returns an immediate NetResult.Error with a 429 status code (e.g., "Queue full / 429").
+---
 
-⚙️ Configuration
-Default network settings are defined in the NetworkConfig class. These can be easily adjusted to suit your application's needs.
-
-Setting	Purpose
-QUEUE_CAPACITY	Bounded queue size to prevent memory pressure.
-THREAD_POOL_SIZE	Number of worker threads to process requests concurrently.
-CONNECT_TIMEOUT_MS	Default connection timeout in milliseconds; can be overridden per request.
-READ_TIMEOUT_MS	Default read timeout in milliseconds; can be overridden per request.
-RETRY_LIMIT	Maximum number of retries for idempotent requests.
-INITIAL_RETRY_DELAY_MS	Initial delay before the first retry (exponential backoff). Honors Retry-After HTTP header.
-
-E-Tablolar'a aktar
-📐 Architecture (PlantUML)
-This diagram illustrates the main components and their interactions within the network layer.
-
-Kod snippet'i
-
+## 📐 Architecture (PlantUML)
+```plantuml
 @startuml
 skinparam classAttributeIconSize 0
 
@@ -174,7 +175,6 @@ class NetworkManager {
   + patch(...)
   + delete(...)
   + upload(...)
-  - enqueueRequest(...)
 }
 
 abstract class "ACommand" as ACommand
@@ -203,21 +203,21 @@ NetworkCallbackT : + onResult(result : NetResultT)
 NetResultSuccessT --|> NetResultT
 NetResultErrorT   --|> NetResultT
 
-NetworkManager o-- ResponseHandler        : uses
-NetworkManager o-- IHttpConnectionFactory : uses
-NetworkManager --> ACommand             : enqueues/uses
-NetworkManager ..> NetResultT           : returns
+NetworkManager o-- ResponseHandler
+NetworkManager o-- IHttpConnectionFactory
+NetworkManager --> ACommand
+NetworkManager ..> NetResultT
 
-ResponseHandler o-- IResponseParser      : delegates to
+ResponseHandler o-- IResponseParser
 GsonResponseParser ..|> IResponseParser
 
-ACommand ..> IHttpConnection            : uses to execute
-ACommand ..> NetworkConfig              : uses for timeouts/retry
-ACommand ..> NetResultT                 : returns
+ACommand ..> IHttpConnection
+ACommand ..> NetworkConfig
+ACommand ..> NetResultT
 
 HttpUrlConnectionFactory ..|> IHttpConnectionFactory
-HttpUrlConnectionFactory --> HttpConnectionAdapter : creates Http connections
-HttpUrlConnectionFactory --> HttpsConnectionAdapter : creates Https connections
+HttpUrlConnectionFactory --> HttpConnectionAdapter
+HttpUrlConnectionFactory --> HttpsConnectionAdapter
 
 HttpConnectionAdapter ..|> IHttpConnection
 HttpsConnectionAdapter ..|> IHttpConnection
@@ -230,18 +230,18 @@ DeleteCommand --|> ACommand
 MultipartCommand --|> ACommand
 
 NetworkManager o-- "RequestTask" : contains
-
 @enduml
-🤝 Contributing
-We welcome contributions! Please follow these steps to contribute:
+```
 
-Fork the repository.
+---
 
-Create a new branch for your feature or bug fix.
+## 🤝 Contributing
+1. Fork this repo  
+2. Create a branch for your feature/fix  
+3. Commit and push  
+4. Open a Pull Request  
 
-Submit a Pull Request (PR) with your changes.
+---
 
-Please include a brief description of your changes, and if relevant, a small test or sample to demonstrate the new functionality or fix.
-
-📄 License
-This project is licensed under the MIT License. See the LICENSE file for more details.
+## 📄 License
+MIT License — see `LICENSE` for details.
