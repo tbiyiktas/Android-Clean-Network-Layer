@@ -24,7 +24,13 @@ public abstract class AHttpClient {
     }
 
     public IHttpConnection createConnection(String fullUrl) throws IOException {
-        return connectionFactory.createConnection(fullUrl);
+        IHttpConnection connection = connectionFactory.createConnection(fullUrl);
+
+        connection.setInstanceFollowRedirects(true);
+        connection.setUseCaches(false);
+        connection.setAllowUserInteraction(false);
+
+        return connection;
     }
 
     // Hatanın düzeltildiği satır

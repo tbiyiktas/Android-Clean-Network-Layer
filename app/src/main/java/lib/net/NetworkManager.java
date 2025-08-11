@@ -162,7 +162,7 @@ public class NetworkManager {
                     }
 
                     MyHttpClient client = new MyHttpClient(task.basePath, connectionFactory);
-                    NetResult finalResult;
+                    NetResult<?> finalResult;
 
                     try {
                         String fullUrl = client.buildUrlString(task.command);

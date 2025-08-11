@@ -1,9 +1,13 @@
 package lib.net.connection;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.GZIPInputStream;
 
 public class HttpConnectionAdapter implements IHttpConnection {
 
@@ -87,4 +91,27 @@ public class HttpConnectionAdapter implements IHttpConnection {
     public void disconnect() {
         connection.disconnect();
     }
+
+    // HttpConnectionAdapter.java (readStream metodu güncellendi)
+    private String readStream(InputStream stream, HttpURLConnection connection) throws IOException {
+        if (stream == null) {
+            return "";
+        }
+
+        // Content-Encoding başlığını kontrol et
+        String contentEncoding = connection.getHeaderField("Content-Encoding");
+        boolean isGzip = "gzip".equalsIgnoreCase(contentEncoding);
+
+        try (InputStream wrappedStream = isGzip ? new GZIPInputStream(stream) : stream;
+             BufferedReader reader = new BufferedReader(new InputStreamReader(wrappedStream, StandardCharsets.UTF_8))) {
+
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            return response.toString();
+        }
+    }
+
 }

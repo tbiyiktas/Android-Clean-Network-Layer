@@ -1,5 +1,7 @@
 package lib.net.command;
 
+import static android.content.ContentValues.TAG;
+
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -187,9 +189,8 @@ public abstract class ACommand implements RequestHandle {
         return result;
     }
 
-    // ... (imports ve diğer metotlar)
 
-    //@Override
+
     public NetResult<String> execute(IHttpConnection connection) {
         int retryCount = 0;
         long retryDelay = NetworkConfig.INITIAL_RETRY_DELAY_MS;
@@ -257,6 +258,9 @@ public abstract class ACommand implements RequestHandle {
         handleException(new IOException("İstek, tekrar deneme limitini aştı."));
         return getResult();
     }
+
+
+
     /*
     public NetResult<String> execute(IHttpConnection connection) {
         int retryCount = 0;
@@ -342,4 +346,28 @@ public abstract class ACommand implements RequestHandle {
     private void enablePatchMethod(IHttpConnection connection) {
         // Reflection tabanlı PATCH metot etkinleştirme kodu...
     }
+
+    // PATCH metodu için reflection ile etkinleştirme
+    private void enablePatchMethod() {
+        try {
+            System.setProperty("http.keepAlive", "false"); // PATCH için özel bir ayar
+            // PATCH methodunu etkinleştirmek için bir metod
+        } catch (Exception e) {
+            Log.e(TAG, "PATCH metodu etkinleştirilemedi: " + e.getMessage());
+        }
+    }
+
+    // Yeni: `getMethodName()` yerine `applyMethod` çağrısında kullanıyoruz
+    public void applyMethod(HttpURLConnection connection) throws IOException {
+        String method = getMethodName();
+        if ("PATCH".equalsIgnoreCase(method)) {
+            enablePatchMethod();
+            connection.setRequestMethod("POST"); // Fallback olarak POST kullan
+            connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+        } else {
+            connection.setRequestMethod(method);
+        }
+    }
+
+
 }
