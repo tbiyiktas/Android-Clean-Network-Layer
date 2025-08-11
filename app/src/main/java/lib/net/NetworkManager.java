@@ -102,6 +102,18 @@ public class NetworkManager {
         return command;
     }
 
+    // Yeni get metodu: Class yerine Type parametresi alıyor
+    public <T> RequestHandle get(String relativePath, HashMap<String, String> queryParams, HashMap<String, String> headers, Type responseType, NetworkCallback<T> callback) {
+        ACommand command = new GetCommand(relativePath, queryParams, headers);
+        RequestTask<T> task = new RequestTask<>(this.basePath, command, callback, responseType);
+        if (!requestQueue.offer(task)) {
+            Log.w(TAG, "Kuyruk dolu, istek reddedildi: " + relativePath);
+            return new RequestHandle() { @Override public void cancel() {} @Override public boolean isCancelled() { return true; } };
+        }
+        activeRequests.put(command, task);
+        return command;
+    }
+
     public <T> RequestHandle get(String relativePath, HashMap<String, String> queryParams, HashMap<String, String> headers, Class<T> responseClass, NetworkCallback<T> callback) {
         ACommand command = new GetCommand(relativePath, queryParams, headers);
         return enqueueRequest(this.basePath, command, responseClass, callback);

@@ -187,6 +187,77 @@ public abstract class ACommand implements RequestHandle {
         return result;
     }
 
+    // ... (imports ve diğer metotlar)
+
+    //@Override
+    public NetResult<String> execute(IHttpConnection connection) {
+        int retryCount = 0;
+        long retryDelay = NetworkConfig.INITIAL_RETRY_DELAY_MS;
+
+        while (retryCount <= NetworkConfig.RETRY_LIMIT) {
+            if (isCancelled()) {
+                handleException(new RequestCancelledException("İstek iptal edildi."));
+                return getResult();
+            }
+            try {
+                connection.setConnectTimeout(customConnectTimeout > 0 ? customConnectTimeout : NetworkConfig.CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(customReadTimeout > 0 ? customReadTimeout : NetworkConfig.READ_TIMEOUT_MS);
+                connection.setRequestMethod(getMethodName());
+
+                // Tüm bağlantı ayarlarını ve veri yazma işlemini burada yapın
+                handleRequest(connection);
+
+                // ÖNEMLİ DÜZELTME: getResponseCode çağrısını en son yapın
+                int responseCode = connection.getResponseCode();
+
+                if (responseCode >= 200 && responseCode < 300 || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                    if (responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
+                        result = new NetResult.Success<>("");
+                    } else {
+                        read(connection);
+                    }
+                    return getResult();
+                } else if (shouldRetry(responseCode)) {
+                    Log.w("RETRY", String.format("Hata kodu: %d, yeniden deneniyor (%d/%d)", responseCode, retryCount + 1, NetworkConfig.RETRY_LIMIT));
+
+                    String retryAfterHeader = connection.getHeaderField("Retry-After");
+                    if (retryAfterHeader != null) {
+                        try {
+                            long serverDelay = Long.parseLong(retryAfterHeader) * 1000;
+                            retryDelay = Math.max(retryDelay, serverDelay);
+                        } catch (NumberFormatException e) {
+                            // Header yanlış biçimli, varsayılan delay'i kullan
+                        }
+                    }
+                    Thread.sleep(retryDelay);
+                    retryDelay *= 2;
+                } else {
+                    handleError(connection, responseCode);
+                    return getResult();
+                }
+            } catch (Exception e) {
+                if (shouldRetryOnException(e)) {
+                    Log.w("RETRY", String.format("Exception: %s, yeniden deneniyor (%d/%d)", e.getMessage(), retryCount + 1, NetworkConfig.RETRY_LIMIT));
+                    try {
+                        Thread.sleep(retryDelay);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                    retryDelay *= 2;
+                } else {
+                    handleException(e);
+                    return getResult();
+                }
+            } finally {
+                connection.disconnect();
+            }
+            retryCount++;
+        }
+
+        handleException(new IOException("İstek, tekrar deneme limitini aştı."));
+        return getResult();
+    }
+    /*
     public NetResult<String> execute(IHttpConnection connection) {
         int retryCount = 0;
         long retryDelay = NetworkConfig.INITIAL_RETRY_DELAY_MS;
@@ -259,7 +330,7 @@ public abstract class ACommand implements RequestHandle {
         handleException(new IOException("İstek, tekrar deneme limitini aştı."));
         return getResult();
     }
-
+*/
     private boolean shouldRetry(int responseCode) {
         return (responseCode == 429 || responseCode == 503) && isIdempotent;
     }

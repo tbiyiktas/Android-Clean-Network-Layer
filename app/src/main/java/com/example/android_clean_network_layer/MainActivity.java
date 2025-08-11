@@ -9,8 +9,12 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.io.IOException;
+import java.util.List;
 
 import lib.net.NetResult;
 import lib.net.NetworkCallback;
@@ -46,9 +50,6 @@ public class MainActivity extends AppCompatActivity {
         statusTextView = findViewById(R.id.statusTextView);
         progressBar = findViewById(R.id.progressBar);
         startRequestsButton = findViewById(R.id.startRequestsButton);
-
-        //NetworkManager.startWorkers();
-
         startRequestsButton.setOnClickListener(v -> startRequests());
     }
 
@@ -60,29 +61,66 @@ public class MainActivity extends AppCompatActivity {
         requestsCompleted = 0;
         totalRequests = 1;
 
-        // 2. Bir Hata Durumu (404)
+        //GET item
+//        NetworkManager exampleApiClient = NetworkManager.create("https://jsonplaceholder.typicode.com");
+//
+//        exampleApiClient.get("/todos/1", null, Todo.class, new NetworkCallback<Todo>() {
+//            @Override
+//            public void onResult(NetResult<Todo> result) {
+//                Log.d(TAG, "Hatalı API isteği tamamlandı.");
+//                handleResult(result);
+//            }
+//        });
+
+
+        // GET LIST
+        Type todoListType = new TypeToken<List<Todo>>() {}.getType();
+
         NetworkManager exampleApiClient = NetworkManager.create("https://jsonplaceholder.typicode.com");
 
-        exampleApiClient.get("/todos/1", null, Todo.class, new NetworkCallback<Todo>() {
+        exampleApiClient.get("/todos", null, null, todoListType, new NetworkCallback<List<Todo>>() {
             @Override
-            public void onResult(NetResult<Todo> result) {
-                Log.d(TAG, "Hatalı API isteği tamamlandı.");
+            public void onResult(NetResult<List<Todo>> result) {
+                // Log mesajını da doğru duruma göre düzenleyelim
+                Log.d(TAG, "API isteği tamamlandı.");
                 handleResult(result);
             }
         });
+
+        //https://10.0.2.2:7122/api/Lookup?pageNumber=1&pageSize=10&withDeleted=false
+//        NetworkManager localApi = NetworkManager.create("https://10.0.2.2:7122");
+//        HashMap<String, String> queryParams = new HashMap<>();
+//        queryParams.put("pageNumber", "1");
+//        queryParams.put("pageSize", "10");
+//        queryParams.put("withDeleted", "false");
+//        Type lookupListType = new TypeToken<List<Lookup>>() {}.getType();
+//
+//        localApi.get(
+//                "/api/Lookup",
+//                queryParams,
+//                null, // headers
+//                lookupListType,
+//                new NetworkCallback<List<Lookup>>() {
+//                    @Override
+//                    public void onResult(NetResult<List<Lookup>> result) {
+//                        handleResult(result);
+//                    }
+//                }
+//        );
+
     }
 
     private void handleResult(NetResult<?> result) {
         requestsCompleted++;
 
         if (result.isSuccess()) {
-            statusTextView.setText(String.format("İstek tamamlandı (%d/%d)", requestsCompleted, totalRequests));
-            Todo todo = (Todo) result.Data();
-            if (todo != null) {
-                Log.d(TAG, "Başarılı yanıt (ayrıştırılmış obje): " + todo.toString());
-            } else {
-                Log.d(TAG, "Başarılı yanıt, ancak veri boş geldi.");
-            }
+//            statusTextView.setText(String.format("İstek tamamlandı (%d/%d)", requestsCompleted, totalRequests));
+//            Todo todo = (Todo) result.Data();
+//            if (todo != null) {
+//                Log.d(TAG, "Başarılı yanıt (ayrıştırılmış obje): " + todo.toString());
+//            } else {
+//                Log.d(TAG, "Başarılı yanıt, ancak veri boş geldi.");
+//            }
         } else if (result.isError()) {
             NetResult.Error<?> error = (NetResult.Error<?>) result;
             int responseCode = error.getResponseCode();
